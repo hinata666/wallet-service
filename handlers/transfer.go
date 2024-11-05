@@ -5,6 +5,7 @@
 package handlers
 
 import (
+	"math"
 	"net/http"
 	"sync"
 
@@ -85,9 +86,9 @@ func Transfer(c *gin.Context) {
 		return
 	}
 
-	// 更新发送方和接收方的余额
-	newSenderBalance := senderWallet.Balance - req.Amount
-	newReceiverBalance := receiverWallet.Balance + req.Amount
+	// 更新发送方和接收方的余额并四舍五入保留两位小数
+	newSenderBalance := math.Round((senderWallet.Balance-req.Amount)*100) / 100
+	newReceiverBalance := math.Round((receiverWallet.Balance+req.Amount)*100) / 100
 
 	if err := models.UpdateWalletBalance(tx, req.SenderID, newSenderBalance); err != nil {
 		HandleError(c, err, http.StatusInternalServerError)
@@ -99,15 +100,23 @@ func Transfer(c *gin.Context) {
 		return
 	}
 
-	// 创建交易记录
-	if err := models.CreateTransaction(tx, req.SenderID, req.ReceiverID, -req.Amount); err != nil {
-		HandleError(c, err, http.StatusInternalServerError)
-		return
-	}
+	// 使用通道和协程异步创建交易记录
+	errChan := make(chan error, 2)
+	go func() {
+		err := models.CreateTransaction(tx, req.SenderID, req.SenderID, -req.Amount)
+		errChan <- err
+	}()
+	go func() {
+		err := models.CreateTransaction(tx, req.SenderID, req.ReceiverID, req.Amount)
+		errChan <- err
+	}()
 
-	if err := models.CreateTransaction(tx, req.ReceiverID, req.SenderID, req.Amount); err != nil {
-		HandleError(c, err, http.StatusInternalServerError)
-		return
+	// 等待创建交易记录的结果
+	for i := 0; i < 2; i++ {
+		if err := <-errChan; err != nil {
+			HandleError(c, err, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// 构建响应数据

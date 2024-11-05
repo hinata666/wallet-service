@@ -5,6 +5,7 @@
 package handlers
 
 import (
+	"math"
 	"net/http"
 	"sync"
 
@@ -66,15 +67,22 @@ func Deposit(c *gin.Context) {
 		return
 	}
 
-	// 更新钱包余额
-	newBalance := wallet.Balance + req.Amount // 新余额 = 余额 + 存款金额
+	// 更新钱包余额并四舍五入保留两位小数
+	newBalance := math.Round((wallet.Balance+req.Amount)*100) / 100
 	if err := models.UpdateWalletBalance(tx, req.UserID, newBalance); err != nil {
 		HandleError(c, err, http.StatusInternalServerError)
 		return
 	}
 
-	// 创建交易记录
-	if err := models.CreateTransaction(tx, req.UserID, req.UserID, req.Amount); err != nil {
+	// 使用通道和协程异步创建交易记录
+	errChan := make(chan error, 1)
+	go func() {
+		err := models.CreateTransaction(tx, req.UserID, req.UserID, req.Amount)
+		errChan <- err
+	}()
+
+	// 等待创建交易记录的结果
+	if err := <-errChan; err != nil {
 		HandleError(c, err, http.StatusInternalServerError)
 		return
 	}
