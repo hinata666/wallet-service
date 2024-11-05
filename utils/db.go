@@ -16,7 +16,7 @@ var db *sql.DB
 func init() {
 	var err error
 	// 连接字符串格式: postgres://user:password@host:port/dbname?sslmode=disable
-	db, err = sql.Open("postgres", "postgres://postgres:Winer123!!@localhost:5432/wallet_db?sslmode=disable")
+	db, err = sql.Open("postgres", "postgres://user:password@localhost:5432/wallet_db?sslmode=disable")
 	if err != nil {
 		fmt.Println("Failed to connect to database:", err)
 		return
