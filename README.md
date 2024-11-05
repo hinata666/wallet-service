@@ -147,6 +147,7 @@ go run main.go
 
 ###### 2.2.1 运行 Dockerfile
 
+需修改数据库配置<br>
 1）构建镜像
 
 ```sh
@@ -161,6 +162,7 @@ docker run -d -p 8080:8080 wallet-service
 
 ###### 2.2.2 运行 docker-compose.yml
 
+需修改数据库配置<br>
 1）构建和启动服务
 
 ```sh
